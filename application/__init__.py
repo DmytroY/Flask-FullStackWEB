@@ -2,7 +2,7 @@ from flask import Flask
 from .config import Config # import configuration class with address of connection to DB and secret key
 from flask_mongoengine import MongoEngine
 
-# instantiate Flask
+# instantiate of Flask
 app = Flask(__name__)
 
 # take configuration options from Config class

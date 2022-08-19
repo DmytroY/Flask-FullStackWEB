@@ -1,11 +1,11 @@
 # 'app' is instance of Flask we initiated in __init__.py file
 from application import app, db
 
-from flask import render_template, request, json, Response
+from flask import render_template, request, json, Response, redirect, flash
 from application.models import User, Course, Enrollment
 from application.forms import LoginForm, RegisterForm
 
-# global variable to be be used in the routines below
+# temporal global variable to be used in the routines below
 courseData = [
     {"courseID":"1111","title":"PHP 111","description":"Intro to PHP","credits":"3","term":"Fall, Spring"},
     {"courseID":"2222","title":"Java 1","description":"Intro to Java Programming","credits":"4","term":"Spring"},
@@ -16,7 +16,7 @@ courseData = [
 @app.route("/")
 @app.route("/index")
 def index():
-    # let's send index=True to the template where implement logic based on it
+    # let's send index=True to the template it will help us to highlite 'Home' tab
     return render_template("index.html", index=True)
 
 
@@ -28,20 +28,22 @@ def api(idx=None):
         jdata = courseData
     else:
         jdata = courseData[int(idx)] # url variables are alvays string type, casting to int is required
-    
     return Response(json.dumps(jdata), mimetype="application/json")
-
-
-
 
 
 @app.route("/login", methods=['GET', 'POST'])
 def login():
+    # using LoginForm class created in 'forms.py" which inherits FlaskForm
     form = LoginForm()
+    if form.validate_on_submit() == True:
+        # testing route
+        if request.form.get("email") == "test@uta.com":
+            # Flask message flashing with category
+            flash("You are successfully logged in!", "success")
+            return redirect("/index")
+        else:
+            flash("Sorry, something went wrong", "danger")
     return render_template("login.html", title="Login", form=form, login=True)
-
-
-
 
 
 @app.route("/register")

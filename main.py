@@ -1,8 +1,8 @@
 # Here everything starts.
 # In case of we do not use .flaskenv file
-# eitger app.py or application.py will run first,
-# but we specified environment variable FLASK_APP=main.py in .flaskenv file,
-# so main.py run first
+# eitger app.py or application.py will runs first,
+# but we have specified environment variable FLASK_APP=main.py in .flaskenv file,
+# so main.py runs first
 
 
 from application import app
