@@ -1,17 +1,9 @@
 # 'app' is instance of Flask we initiated in __init__.py file
 from application import app, db
 
-from flask import render_template, request, json, Response, redirect, flash
+from flask import render_template, request, json, Response, redirect, flash, url_for, session
 from application.models import User, Course, Enrollment
 from application.forms import LoginForm, RegisterForm
-
-# temporal global variable to be used in the routines below
-courseData = [
-    {"courseID":"1111","title":"PHP 111","description":"Intro to PHP","credits":"3","term":"Fall, Spring"},
-    {"courseID":"2222","title":"Java 1","description":"Intro to Java Programming","credits":"4","term":"Spring"},
-    {"courseID":"3333","title":"Adv PHP 201","description":"Advanced PHP Programming","credits":"3","term":"Fall"},
-    {"courseID":"4444","title":"Angular 1","description":"Intro to Angular","credits":"3","term":"Fall, Spring"},
-    {"courseID":"5555","title":"Java 2","description":"Advanced Java Programming","credits":"4","term":"Fall"}]
 
 @app.route("/")
 @app.route("/index")
@@ -33,54 +25,128 @@ def api(idx=None):
 
 @app.route("/login", methods=['GET', 'POST'])
 def login():
+    # check session, may be user already logined
+    if session.get('username'):
+        return redirect(url_for('index'))
+
     # using LoginForm class created in 'forms.py" which inherits FlaskForm
     form = LoginForm()
     if form.validate_on_submit() == True:
-        # testing route
-        if request.form.get("email") == "test@uta.com":
-            # Flask message flashing with category
-            flash("You are successfully logged in!", "success")
+        email = form.email.data
+        password = form.password.data
+
+        user = User.objects(email=email).first()
+        if user and user.check_password(password):
+            session['user_id'] = user.user_id
+            session['username'] =user.first_name
+            flash(f"{user.first_name}, you are successfully logged in!", "success")
             return redirect("/index")
         else:
             flash("Sorry, something went wrong", "danger")
     return render_template("login.html", title="Login", form=form, login=True)
 
 
-@app.route("/register")
+@app.route("/logout")
+def logout():
+    session['user_id'] = False
+    session.pop('username',None)
+    return redirect(url_for('index'))
+
+@app.route("/register", methods=['GET', 'POST'])
 def register():
-    return render_template("register.html", register=True)
+    # check session, may be user already logined
+    if session.get('username'):
+        return redirect(url_for('index'))
+
+    form = RegisterForm()
+    if form.validate_on_submit() == True:
+        email = form.email.data
+        password = form.password.data
+        first_name = form.fist_name.data
+        last_name = form.last_name.data
+
+        user_id = User.objects.count() +1
+        user = User(user_id=user_id, email=email, first_name=first_name, last_name=last_name)
+        user.set_password_hash(password)
+        user.save()
+        flash(f"{first_name}, you are successfully registered!", "success")
+        return redirect(url_for("index"))
+
+    return render_template("register.html", title="Register", form=form, register=True)
 
 
 @app.route("/courses/")
 @app.route("/courses/<term>") # url variable came to us to be processed later
-def courses(term="2019"): # term="2019" by default
+def courses(term="2019"):
 
+    courseData = Course.objects.order_by("-courseID") # extract all Course records and order by decending courseID
     return render_template("courses.html", courseData=courseData, courses=True, term=term)
 
 
 @app.route("/enrollment", methods=['GET', 'POST'])
+
+
+
 # by initial plan this procedure initiated by courses.thml form
 def enrollment():
-    # reading form imputs, in case of method POST
-    if request.method =='POST':
-        id = request.form.get('courseID')
-        title = request.form.get('title')
-        term = request.form.get('term')
-    else:
-        # reading form imputs, in case of method GET
-        id = request.args.get('courseID')
-        title = request.args.get('title')
-        term = request.args.get('term')
 
-    # render templat in response
-    return render_template("enrollment.html", enrollment=True, data={"id":id, "title":title, "term":term })
+    #check if user logoned
+    if not session.get('username'):
+        return redirect(url_for('login'))
+
+    # reading form imputs, method is POST
+    courseID = request.form.get('courseID')
+    courseTitle = request.form.get('title')
+    user_id = session.get('user_id')
+
+    if courseID:
+        if Enrollment.objects(user_id=user_id, courseID=courseID):
+            flash(f"Sorry, you already registered for the course {courseTitle}","danger")
+        else:
+            Enrollment(user_id=user_id, courseID=courseID).save()
+            flash(f"You are enrolled in {courseTitle}", "success")
+
+    classes = list( User.objects.aggregate(*[
+                {
+                    '$lookup': {
+                        'from': 'enrollment', 
+                        'localField': 'user_id', 
+                        'foreignField': 'user_id', 
+                        'as': 'r1'
+                    }
+                }, {
+                    '$unwind': {
+                        'path': '$r1', 
+                        'includeArrayIndex': 'r1_id', 
+                        'preserveNullAndEmptyArrays': False
+                    }
+                }, {
+                    '$lookup': {
+                        'from': 'course', 
+                        'localField': 'r1.courseID', 
+                        'foreignField': 'courseID', 
+                        'as': 'r2'
+                    }
+                }, {
+                    '$unwind': {
+                        'path': '$r2', 
+                        'preserveNullAndEmptyArrays': False
+                    }
+                }, {
+                    '$match': {
+                        'user_id': user_id
+                    }
+                }, {
+                    '$sort': {
+                        'couseID': -1
+                    }
+                }
+            ]))
+
+    return render_template("enrollment.html", enrollment=True, title="Enrolment", classes=classes)
 
 
 @app.route("/user")
 def user():
-    # User(user_id=1, first_name="Chritian", last_name="Hur", email="chris@uta.com", password="abc123").save()
-    # User(user_id=2, first_name="Mary", last_name="Jane", email="m.jane@uta.com", password="abc123").save()
     users = User.objects.all()
-    #print(users)
     return render_template("user.html", users=users)
-    #return("ok")

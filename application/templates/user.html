@@ -6,9 +6,9 @@
             {% if users %}
                 {% for user in users %}
                 <dl>
-                    <dt>User ID: {{ user.id }}</dt>
+                    <dt>User ID: {{ user.user_id }}</dt>
                     <dd>Email: {{ user.email }}</dd>
-                    <dd>Password: {{ user.password }}</dd>
+                    <dd>Password_hash: {{ user.password_hash }}</dd>
                 </dl>
                 {% endfor %}
             {% else %}
